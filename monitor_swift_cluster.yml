@@ -2,7 +2,27 @@
 - name: Setup monitoring on storage and proxy hosts
   hosts: storage,proxy
   roles:
-    - role: performancecopilot.metrics.grafana
+    - role: performancecopilot.metrics.redis
     - role: performancecopilot.metrics.pcp
       vars:
         pcp_rest_api: true
+        pcp_pmlogger_interval: 1
+
+- name: Setup Grafana
+  hosts: grafana
+  roles:
+    - role: performancecopilot.metrics.redis
+    - role: performancecopilot.metrics.grafana
+
+
+- name: Add PCP Redis datasource to Grafana
+  hosts: grafana
+  tasks:
+    - name: install pip
+      command: yum install -y python3-pip
+    - name:  pip install grafana
+      command: pip install grafana-client
+    - name: Run the configure_grafana.py script
+      script: configure_grafana.py
+      args:
+        executable: python3

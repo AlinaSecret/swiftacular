@@ -7,6 +7,7 @@ nodes = {
     # 'swift-lbssl' => [1, 30],
     'swift-proxy'   => [1, 100],
     'swift-storage' => [3, 200],
+    'grafana'       => [1, 150],
 }
 
 Vagrant.configure("2") do |config|
