@@ -1,0 +1,85 @@
+from cpmapi import PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_INSTANT
+import cpmapi
+from pcp.pmapi import pmUnits, pmContext
+from pcp.pmda import PMDA, pmdaMetric, pmdaInstid, pmdaIndom
+import subprocess
+from swift.container.backend import ContainerBroker
+
+kbyteUnits = pmUnits(1, 0, 0, cpmapi.PM_SPACE_KBYTE, 0, 0)
+class EtcdPMDA(PMDA):
+
+    def __init__(self, name, domain):
+        super().__init__(name, domain)
+
+        self.dbs = {}
+        self.dbNames = {}
+        self.db_instances = []
+        self.db_instances_indom = self.indom(0)
+        self.next_id = 1
+        self.add_dbs()
+        self.add_indom(pmdaIndom(self.db_instances_indom, self.db_instances))
+        #self.set_instance(self.simple_instance)
+        self.set_fetch(self.simple_fetch)
+        self.set_fetch_callback(self.fetch_callback)
+        self.add_metric(name + '.size', pmdaMetric(
+            PMDA.pmid(0, 0),
+            PM_TYPE_U64,
+            self.db_instances_indom,
+            PM_SEM_INSTANT,
+            kbyteUnits
+        ))
+
+
+    def get_dbs(self):
+        command = [
+            'find', '/srv', '-type', 'f',
+            '(', '-name', '*.sqlite', '-o', '-name', '*.db', '-o', '-name', '*.sqlite3', ')'
+        ]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate()
+        if process.returncode != 0:
+            self.log(f"Error: {stderr}")
+        return stdout.splitlines()
+
+    def add_dbs(self):
+        try:
+            for db in self.get_dbs():
+                if "containers" in db:
+                    try:
+                        c = ContainerBroker(db)
+                        d = c.get_info()
+                        dbName = d["container"]+ ":" +  d["account"] + ":" + d["hash"]
+                        if dbName not in self.dbNames:
+                            self.dbNames[dbName] = True
+                            self.dbs[self.next_id] = db
+                            self.db_instances.append(pmdaInstid(int(self.next_id), dbName))
+                            self.next_id += 1
+                    except:
+                        self.log("excepton")
+                        self.log(db)
+        except:
+            self.log("big")
+
+    def simple_instance(self, serial):
+        if serial == 0:
+            self.simple_fetch()
+
+    def simple_fetch(self):
+        self.add_dbs()
+        self.replace_indom(self.db_instances_indom, self.db_instances)
+
+    # item is id of metric is this pdma as set in add metric fucntion
+    def fetch_callback(self, cluster, item, inst):
+        self.log(f"{cluster} {item} {inst}")
+        if (item == 0):
+            try:
+                c = ContainerBroker(self.dbs[inst])
+                d = c.get_info()
+                return [d["bytes_used"], 1]
+            except:
+                pass
+        return [100, 1] # return result and 1 for sucsees 0 for failure
+
+
+if __name__ == '__main__':
+    EtcdPMDA('swiftdbinfo', 400).run()

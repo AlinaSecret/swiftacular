@@ -30,8 +30,8 @@ run_playbook() {
 
 # Run the playbooks with timing and logging
 echo start
-vagrant up > /dev/null
-ANSIBLE_CONFIG=ansible.cfg ANSIBLE_LIBRARY=library ansible-playbook -i hosts monitor_swift_cluster.yml > /dev/null
+vagrant up
+ANSIBLE_CONFIG=ansible.cfg ANSIBLE_LIBRARY=library ansible-playbook -i hosts monitor_swift_cluster.yml
 python configure_grafana.py create-dashboard ${grafana_ip}:3000 admin admin host_overview_dashboard.json ${dashboard_uid}
 echo "Grafana Dashboard for live view: http://${grafana_ip}:3000/d/${dashboard_uid}/"
 run_playbook "deploy_swift_cluster.yml" "Deploy Swift Cluster"

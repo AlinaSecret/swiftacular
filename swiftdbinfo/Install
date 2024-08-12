@@ -7,6 +7,7 @@ domain=400
 python_opt=true
 daemon_opt=false
 
+python -m pip install swift
 pmdaSetup
 pmdaInstall
 exit
