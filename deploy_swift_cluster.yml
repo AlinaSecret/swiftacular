@@ -4,7 +4,7 @@
   - all
   gather_facts: yes
   tasks:
-  - name: sudo yum update && upgrade --nobest
+  - name: sudo yum update && upgrade
     shell: |
       yum update -y
       yum upgrade -y

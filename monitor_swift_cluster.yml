@@ -8,6 +8,31 @@
         pcp_rest_api: true
         pcp_pmlogger_interval: 1
 
+- name: Setup swift dbinfo pmda on storage and proxy hosts
+  hosts: storage,proxy
+  tasks:
+    - name:
+      copy:
+        src: swiftdbinfo/
+        dest: /var/lib/pcp/pmdas/swiftdbinfo/
+        mode: u=rwx,g=rwx,o=rwx
+    - name: Run the configure_grafana.py
+      command: sudo chown $USER /var/lib/pcp/pmdas/swiftdbinfo
+    - name: Install
+      shell: |
+            cd /var/lib/pcp/pmdas/swiftdbinfo
+            sudo ./Install
+    - name: Install2
+      shell: |
+            sudo sed -i '/\[access\]/i\
+            log mandatory on default {\
+            swiftdbinfo.size\
+            }
+
+            ' /var/lib/pcp/config/pmlogger/config.default
+    - name: Restart pmlogger
+      command: sudo systemctl restart pmlogger
+
 - name: Setup Grafana
   hosts: grafana
   roles:
@@ -23,6 +48,18 @@
     - name:  pip install grafana
       command: pip install grafana-client
     - name: Run the configure_grafana.py script
-      script: configure_grafana.py
+      script: configure_grafana.py  delete-default-pcp-datasource {{ hostvars['grafana-01']['ansible_default_ipv4']['address'] }}:3000 admin admin
+      args:
+        executable: python3
+
+- name: Add PCP Redis datasource to Grafana
+  hosts: storage,proxy
+  tasks:
+    - name: install pip
+      command: yum install -y python3-pip
+    - name:  pip install grafana
+      command: pip install grafana-client
+    - name: Run the configure_grafana.py script
+      script: configure_grafana.py  create-pcp-datasource {{ hostvars['grafana-01']['ansible_default_ipv4']['address'] }}:3000 admin admin {{ inventory_hostname }} {{ ansible_host }}
       args:
         executable: python3

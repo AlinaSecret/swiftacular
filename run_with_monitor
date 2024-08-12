@@ -1,0 +1,39 @@
+#!/bin/bash
+
+dashboard_uid="host"
+grafana_ip="192.168.100.150"
+
+# Function to run ansible-playbook and log the time
+run_playbook() {
+  local playbook=$1
+  local description=$2
+
+  echo "Running $description..."
+  local start_time=$(date +%s%3N)  # Get start time in epoch milliseconds
+
+  ANSIBLE_CONFIG=ansible.cfg ANSIBLE_LIBRARY=library ansible-playbook -i hosts $playbook > /dev/null
+
+  local end_time=$(date +%s%3N)  # Get end time in epoch milliseconds
+  local duration=$((end_time - start_time))  # Duration in milliseconds
+
+  local duration_seconds=$((duration / 1000))
+  local minutes=$((duration_seconds / 60))
+  local seconds=$((duration_seconds % 60))
+
+  echo "$description completed in $minutes minutes and $seconds seconds."
+
+  # Generate Grafana link with epoch milliseconds
+  local grafana_link="http://${grafana_ip}:3000/d/${dashboard_uid}/?from=${start_time}&to=${end_time}"
+  echo "Grafana Dashboard for $description: $grafana_link"
+}
+
+
+# Run the playbooks with timing and logging
+echo start
+vagrant up > /dev/null
+ANSIBLE_CONFIG=ansible.cfg ANSIBLE_LIBRARY=library ansible-playbook -i hosts monitor_swift_cluster.yml > /dev/null
+python configure_grafana.py create-dashboard ${grafana_ip}:3000 admin admin host_overview_dashboard.json ${dashboard_uid}
+echo "Grafana Dashboard for live view: http://${grafana_ip}:3000/d/${dashboard_uid}/"
+run_playbook "deploy_swift_cluster.yml" "Deploy Swift Cluster"
+run_playbook "setup_workload_test.yml" "Setup Workload Test"
+#tasks: dashboard , tidy commits , gerrithub
