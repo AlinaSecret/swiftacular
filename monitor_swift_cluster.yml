@@ -6,15 +6,15 @@
     - role: performancecopilot.metrics.pcp
       vars:
         pcp_rest_api: true
-        pcp_pmlogger_interval: 1
+        pcp_pmlogger_interval: 30
 
 - name: Setup swift dbinfo pmda on storage and proxy hosts
-  hosts: storage,proxy
+  hosts: storage, proxy
   tasks:
     - name: yum update
-      command: sudo yum update
+      command: sudo yum install -y centos-release-openstack-zed
     - name: install pip
-      command: yum install -y python3-pip python3-devel python3 liberasurecode-devel
+      command: sudo yum install -y python3-pip python3-devel pcp-devel liberasurecode-devel
     - name:
       copy:
         src: swiftdbinfo/
@@ -29,13 +29,17 @@
     - name: Install2
       shell: |
             sudo sed -i '/\[access\]/i\
-            log mandatory on default {\
+            log mandatory on every 30 seconds {\
             swiftdbinfo.size\
+            swiftdbinfo.object.count\
+            swiftdbinfo.object.dist\
             }
 
             ' /var/lib/pcp/config/pmlogger/config.default
     - name: Restart pmlogger
       command: sudo systemctl restart pmlogger
+    - name: sudo setenforce 0
+      command: sudo setenforce 0
 
 - name: Setup Grafana
   hosts: grafana
@@ -43,6 +47,13 @@
     - role: performancecopilot.metrics.redis
     - role: performancecopilot.metrics.grafana
 
+- name: Add echarts to Grafana
+  hosts: grafana
+  tasks:
+    - name: install echarts
+      command: sudo grafana-cli plugins install volkovlabs-echarts-panel
+    - name: install echarts
+      command: sudo systemctl restart grafana-server
 
 - name: Add PCP Redis datasource to Grafana
   hosts: grafana

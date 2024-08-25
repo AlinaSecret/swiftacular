@@ -1,0 +1,193 @@
+// Function to extract counts based on the field index
+function getCountsByFieldIndex(jsonData, instanceName) {
+  let counts = [];
+
+  // Trim extra quotes or spaces from instanceName
+  instanceName = instanceName.trim().replace(/^"|"$/g, '');
+
+  // Check if jsonData is an array and contains elements
+  if (Array.isArray(jsonData) && jsonData.length > 0) {
+    const firstItem = jsonData[0];
+
+    // Check if  'fields' exist in the first item
+    if (firstItem && firstItem && firstItem.fields) {
+      // Find the field that exactly matches the instanceName
+      const field = firstItem.fields.find(f => f.name.trim() === instanceName);
+      if (field) {
+
+        // Check if 'data' and 'values' exist in the JSON
+        if (field.values) {
+          // Extract values at the field index
+          const values = field.values;
+          // Iterate through values to get counts
+          values.forEach(valueString => {
+            // Remove quotes and split by comma
+            const pairs = valueString.replace(/"/g, '').split(', ');
+            // Create a list of counts
+            const countsList = pairs.map(pair => parseInt(pair.split('=')[1], 10));
+            counts.push(countsList);
+          });
+        }
+      } else {
+        console.log("Field with the specified instance name not found.");
+      }
+    } else {
+      console.log("Invalid JSON structure.");
+    }
+  } else {
+    console.log("Invalid JSON data format.");
+  }
+
+  return counts;
+}
+
+// Function to extract keys based on the field index
+function getKeysByFieldIndex(jsonData, instanceName) {
+  let keys = [];
+
+  // Trim extra quotes or spaces from instanceName
+  instanceName = instanceName.trim().replace(/^"|"$/g, '');
+
+  // Check if jsonData is an array and contains elements
+  if (Array.isArray(jsonData) && jsonData.length > 0) {
+    const firstItem = jsonData[0];
+
+    // Check if  'fields' exist in the first item
+    if (firstItem && firstItem && firstItem.fields) {
+      // Find the field that exactly matches the instanceName
+      const field = firstItem.fields.find(f => f.name.trim() === instanceName);
+
+      if (field) {
+
+        // Check if 'data' and 'values' exist in the JSON
+        if (field.values) {
+          // Extract values at the field index
+          const values = field.values;
+
+          // Extract keys from the first string
+          const firstString = values[0].replace(/"/g, '');
+          keys = firstString.split(', ').map(pair => pair.split('=')[0]);
+        }
+      } else {
+        console.log("Field with the specified instance name not found.");
+      }
+    } else {
+      console.log("Invalid JSON structure.");
+    }
+  } else {
+    console.log("Invalid JSON data format.");
+  }
+
+  return keys;
+}
+
+// Function to convert timestamps to human-readable time
+function getReadableTimestamps(jsonData) {
+  let timestamps = [];
+
+  // Check if jsonData is an array and contains elements
+  if (Array.isArray(jsonData) && jsonData.length > 0) {
+    const firstItem = jsonData[0];
+
+    // Check if 'data' and 'values' exist in the JSON
+    if (firstItem && firstItem.fields) {
+      // Extract the timestamps from the first value array
+      const timestampValues = firstItem.fields[0].values;
+
+      // Convert each timestamp to human-readable format
+      timestamps = timestampValues.map(ts => {
+        const date = new Date(ts);
+        return date.toLocaleString(); // Adjust format as needed
+      });
+      console.log(timestamps)
+    } else {
+      console.log("Invalid JSON structure.");
+    }
+  } else {
+    console.log("Invalid JSON data format.");
+  }
+
+  return timestamps;
+}
+
+/**
+ * Function to format a 2D array into a list of strings.
+ * @param {Array} dataArray - The 2D array to be formatted.
+ * @returns {Array} - An array of formatted strings.
+ */
+function formatArrayToStrings(dataArray) {
+  let formattedStrings = [];
+
+  // Check if dataArray is a 2D array
+  if (Array.isArray(dataArray) && dataArray.length > 0 && Array.isArray(dataArray[0])) {
+    dataArray.forEach((innerArray, i) => {
+      innerArray.forEach((value, j) => {
+        // Create the formatted string and push it to the result array
+        let formattedString = `${i}-${j}-${value}`;
+        formattedStrings.push(formattedString);
+      });
+    });
+  } else {
+    console.log("Invalid array format.");
+  }
+
+  return formattedStrings;
+}
+
+
+const a = context.panel.data.series
+const instanceName = "swiftdbinfo.object.dist[1724457561:.expiring_objects:ffe212df39304862107b9fd89082c373]";
+const hours = getReadableTimestamps(a);
+const days = getKeysByFieldIndex(a, instanceName);
+const data = formatArrayToStrings(getCountsByFieldIndex(a, instanceName));
+console.log(hours)
+console.log(days)
+console.log(data)
+option = {
+  tooltip: {
+    position: 'top'
+  },
+  grid: {
+    height: '50%',
+    top: '10%'
+  },
+  xAxis: {
+    type: 'category',
+    data: hours,
+    splitArea: {
+      show: true
+    }
+  },
+  yAxis: {
+    type: 'category',
+    data: days,
+    splitArea: {
+      show: true
+    }
+  },
+  visualMap: {
+    min: 0,
+    max: 10,
+    calculable: true,
+    orient: 'horizontal',
+    left: 'center',
+    bottom: '15%'
+  },
+  series: [
+    {
+      name: 'Punch Card',
+      type: 'heatmap',
+      data: data,
+      label: {
+        show: true
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowColor: 'rgba(0, 0, 0, 0.5)'
+        }
+      }
+    }
+  ]
+};
+return option;

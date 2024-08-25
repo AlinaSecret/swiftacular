@@ -27,7 +27,7 @@ Vagrant.configure("2") do |config|
             hostname = "%s-%02d" % [prefix, (i+1)]
 
             config.vm.provider :libvirt do |v|
-                v.memory = 512
+                v.memory = 3072
             end
 
             config.vm.define "#{hostname}" do |box|
