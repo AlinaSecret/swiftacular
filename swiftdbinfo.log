@@ -1,2 +1,11 @@
-Log for pmdaswiftdbinfo on asudakov-thinkpadt14sgen2i.raanaii.csb started Fri Aug 23 13:40:42 2024
+Log for pmdaswiftdbinfo on asudakov-thinkpadt14sgen2i.raanaii.csb started Thu Sep  5 19:28:27 2024
 
+[Thu Sep  5 19:28:30] pmdaswiftdbinfo(58236) Critical: __pmdaSetupPDU: PMDA pmdaswiftdbinfo: version exchange failure, got PDU type TYPE-0? expecting PDU_CREDS)
+__pmDumpPDUTrace: recent PDUs ...
+[0] xmit fd=1 type=CREDS len=20
+Traceback (most recent call last):
+  File "/home/asudakov/go/src/github.com/AlinaSecret/swiftacular/swiftdbinfo/pmdaswiftdbinfo.py", line 258, in <module>
+    EtcdPMDA('swiftdbinfo', 400).run()
+  File "/usr/lib64/python3.12/site-packages/pcp/pmda.py", line 525, in run
+    cpmda.pmda_dispatch(self._indomtable, self._metrictable)
+KeyboardInterrupt

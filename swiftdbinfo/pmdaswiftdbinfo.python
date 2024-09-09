@@ -6,6 +6,7 @@ import subprocess
 from swift.container.backend import ContainerBroker
 import sqlite3
 import json
+from datetime import datetime, timezone
 
 bucket_dict = {
     '0-1 KB': 1024,
@@ -35,6 +36,7 @@ class EtcdPMDA(PMDA):
 
         self.dbs = {}
         self.dbNames = {}
+        self.dbTimes = {}
         self.db_instances = []
         self.db_instances_indom = self.indom(0)
         self.next_id = 0
@@ -44,7 +46,7 @@ class EtcdPMDA(PMDA):
         self.set_fetch(self.simple_fetch)
         self.set_fetch_callback(self.fetch_callback)
         self.set_label_callback(self.simple_label_callback)
-        self.set_label(self.simple_label)
+        #self.set_label(self.simple_label)
         self.add_metric(name + '.size', pmdaMetric(
             PMDA.pmid(0, 0),
             PM_TYPE_U64,
@@ -57,7 +59,7 @@ class EtcdPMDA(PMDA):
             PM_TYPE_U64,
             self.db_instances_indom,
             PM_SEM_INSTANT,
-            kbyteUnits
+            countUnits
         ))
         self.add_metric(name + '.object.dist', pmdaMetric(
             PMDA.pmid(0, 2),
@@ -86,12 +88,16 @@ class EtcdPMDA(PMDA):
                     try:
                         c = ContainerBroker(db)
                         d = c.get_info()
+                        now = datetime.now(timezone.utc)
+                        epoch_timestamp = int(now.timestamp())
                         dbName = d["container"] +  d["account"] + d["hash"]
-                        if dbName not in self.dbNames:
+                        #todo reaplce - to _
+                        if dbName not in self.dbNames and "expiring" not in d["account"]:
+                            self.dbTimes[self.next_id] = str(epoch_timestamp) + dbName
                             self.dbNames[dbName] = True
                             self.dbs[self.next_id] = db
-                            self.db_instances.append(pmdaInstid(int(self.next_id), dbName))
-                            self.add_label(dbName, self.next_id)
+                            self.db_instances.append(pmdaInstid(int(self.next_id), str(epoch_timestamp) + dbName))
+                            #self.add_label(dbName, self.next_id)
                             self.next_id += 1
                     except Exception as e:
                         self.log(str(e))
@@ -101,32 +107,32 @@ class EtcdPMDA(PMDA):
             self.log("big")
 
 
-    def add_label(self, dbname, index):
-        label = '{%s}' % f'"swiftdb{dbname}":"ok"'
-        try:
-            with open(f"/etc/pcp/labels/{index}", 'w') as f:
-                f.write(label)
-        except Exception as e:
-            self.log(f"An error occurred: {e}")
+    # def add_label(self, dbname, index):
+    #     label = '{%s}' % f'"swiftdb{dbname}":"ok"'
+    #     try:
+    #         with open(f"/etc/pcp/labels/{index}", 'w') as f:
+    #             f.write(label)
+    #     except Exception as e:
+    #         self.log(f"An error occurred: {e}")
 
-    def simple_label(self, ident, type):
-        '''
-        Return JSONB format labelset for identifier of given type, as a string
-        '''
-        if type == cpmapi.PM_LABEL_DOMAIN:
-           pass
-            #ret = '"role":"testing"'
-        elif type == cpmapi.PM_LABEL_INDOM:
-            indom = ident
-            if indom == self.db_instances_indom:
-                pass
-                #ret = '"indom_name":"time","unitsystem":"SI"'
-        else: # no labels added for types PM_LABEL_CLUSTER, PM_LABEL_ITEM
-            ret = '' # default is an empty labelset string
-        # self.log("simple_label(%#x,%d) returning {%s}" % (ident, type, ret))
-        #ret = ",".join([f'"swiftdb_{name}":"found"' for name  in self.dbNames.keys()][0:1])
-        #self.log('{"swiftDBNames": %s}' % str([name for name  in self.dbNames.keys()]))
-        return '{"swiftDBNames": [%s]}' % ",".join([f'"{name}"' for name  in self.dbNames.keys()])
+    # def simple_label(self, ident, type):
+    #     '''
+    #     Return JSONB format labelset for identifier of given type, as a string
+    #     '''
+    #     if type == cpmapi.PM_LABEL_DOMAIN:
+    #        pass
+    #         #ret = '"role":"testing"'
+    #     elif type == cpmapi.PM_LABEL_INDOM:
+    #         indom = ident
+    #         if indom == self.db_instances_indom:
+    #             pass
+    #             #ret = '"indom_name":"time","unitsystem":"SI"'
+    #     else: # no labels added for types PM_LABEL_CLUSTER, PM_LABEL_ITEM
+    #         ret = '' # default is an empty labelset string
+    #     # self.log("simple_label(%#x,%d) returning {%s}" % (ident, type, ret))
+    #     #ret = ",".join([f'"swiftdb_{name}":"found"' for name  in self.dbNames.keys()][0:1])
+    #     #self.log('{"swiftDBNames": %s}' % str([name for name  in self.dbNames.keys()]))
+    #     return '{"swiftDBNames": [%s]}' % ",".join([f'"{name}"' for name  in self.dbNames.keys()])
 
 
     def simple_label_callback(self, indom, inst):
@@ -135,8 +141,8 @@ class EtcdPMDA(PMDA):
         '''
         self.log("lables")
         if inst in self.dbs.keys():
-            path = self.dbs[inst]
-            ret = f'"swift_db_name":"{path}"'
+            timedName = self.dbTimes[inst]
+            ret = f'"swift_db_name":"{timedName}"'
             self.log(ret)
         else:
             ret = ''

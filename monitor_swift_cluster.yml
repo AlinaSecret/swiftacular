@@ -29,7 +29,7 @@
     - name: Install2
       shell: |
             sudo sed -i '/\[access\]/i\
-            log mandatory on every 30 seconds {\
+            log mandatory on every 60 seconds {\
             swiftdbinfo.size\
             swiftdbinfo.object.count\
             swiftdbinfo.object.dist\
@@ -38,8 +38,8 @@
             ' /var/lib/pcp/config/pmlogger/config.default
     - name: Restart pmlogger
       command: sudo systemctl restart pmlogger
-    - name: sudo setenforce 0
-      command: sudo setenforce 0
+    - name: sudo restorecon -R /srv
+      command: sudo restorecon -R /srv
 
 - name: Setup Grafana
   hosts: grafana
@@ -59,9 +59,11 @@
   hosts: grafana
   tasks:
     - name: install pip
-      command: yum install -y python3-pip
-    - name:  pip install grafana
-      command: pip install grafana-client
+      command: yum install -y python3-pip python3-devel
+    - name: install dev tools
+      command: sudo yum groupinstall -y 'Development Tools'
+    - name:  pip install grafana and jsonnet
+      command: pip install grafana-client jsonnet
     - name: Run the configure_grafana.py script
       script: configure_grafana.py  delete-default-pcp-datasource {{ hostvars['grafana-01']['ansible_default_ipv4']['address'] }}:3000 admin admin
       args:
@@ -70,8 +72,10 @@
 - name: Add PCP Redis datasource to Grafana
   hosts: storage,proxy
   tasks:
-    - name:  pip install grafana
-      command: pip install grafana-client
+    - name: install dev tools
+      command: sudo yum groupinstall -y 'Development Tools'
+    - name:  pip install grafana and jsonnet
+      command: pip install grafana-client jsonnet
     - name: Run the configure_grafana.py script
       script: configure_grafana.py  create-pcp-datasource {{ hostvars['grafana-01']['ansible_default_ipv4']['address'] }}:3000 admin admin {{ inventory_hostname }} {{ ansible_host }}
       args:

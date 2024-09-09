@@ -1,6 +1,9 @@
 import argparse
 import json
+import subprocess
 from grafana_client import GrafanaApi
+import _jsonnet
+import os
 
 # Initialize the Grafana API client
 def initialize_client(endpoint, user, password):
@@ -34,15 +37,64 @@ def delete_default_pcp_datasource(client):
     except Exception as e:
         print(f"Failed to delete default PCP datasource: {e}")
 
+def try_path(dir, rel):
+    if not rel:
+        raise RuntimeError('Got invalid filename (empty string).')
+    if rel[0] == '/':
+        full_path = rel
+    else:
+        full_path = dir + rel
+    if full_path[-1] == '/':
+        raise RuntimeError('Attempted to import a directory')
+
+    if not os.path.isfile(full_path):
+        return full_path, None
+    with open(full_path) as f:
+        return full_path, f.read()
+
+
+def import_callback(dir, rel):
+    full_path, content = try_path(dir + "vendor", rel)
+    if content:
+        return full_path, content
+    raise RuntimeError('File not found')
+
+def run_jsonnet_with_imports(jsonnet_file):
+    try:
+        result = subprocess.run(
+            ['jsonnet', jsonnet_file], capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout
+        else:
+            print(f"Error: {result.stderr}")
+    except FileNotFoundError:
+        print("Jsonnet executable not found. Ensure it's installed and in your PATH.")
+
+
 # Read dashboard JSON from file
 def read_dashboard_from_file(file_path):
+    return json.loads(run_jsonnet_with_imports(file_path))
     try:
         with open(file_path, 'r') as file:
-            return json.load(file)
+            return json.loads(convert_jsonnet_to_json(file.read()))
     except Exception as e:
         print(f"Failed to read dashboard file: {e}")
         raise(e)
         return None
+
+def convert_jsonnet_to_json(jsonnet_snippet):
+    """
+    Convert a Jsonnet snippet into JSON.
+
+    Parameters:
+    - jsonnet_snippet (str): The Jsonnet code as a string.
+
+    Returns:
+    - str: The JSON output.
+    """
+    json_str = _jsonnet.evaluate_snippet('snippet', jsonnet_snippet)
+    return json_str
 
 # Create dashboard
 def create_dashboard(client, dashboard_json, uid):
