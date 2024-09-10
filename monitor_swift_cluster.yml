@@ -38,8 +38,6 @@
             ' /var/lib/pcp/config/pmlogger/config.default
     - name: Restart pmlogger
       command: sudo systemctl restart pmlogger
-    - name: sudo restorecon -R /srv
-      command: sudo restorecon -R /srv
 
 - name: Setup Grafana
   hosts: grafana

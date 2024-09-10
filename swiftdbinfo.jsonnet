@@ -1,10 +1,9 @@
 local g = import 'github.com/grafana/grafonnet/gen/grafonnet-v11.0.0/main.libsonnet';
 
-
-
 local vars = {
   datasource:
-    g.dashboard.variable.datasource.new('datasource', 'pcp-redis-datasource'),
+    g.dashboard.variable.datasource.new('datasource', 'pcp-redis-datasource')
+    + g.dashboard.variable.datasource.withRegex(".*storage.*"),
 
   host:
     g.dashboard.variable.query.new('host', "label_values(hostname)")
@@ -19,7 +18,7 @@ local vars = {
     + g.dashboard.variable.query.withRefresh('time'),
 };
 
-g.dashboard.new('PCP Redis: Host Overview5')
+g.dashboard.new('Swift DB info')
 + g.dashboard.withTags(['swift'])
 + g.dashboard.time.withFrom('now-30m')
 + g.dashboard.time.withTo('now')
@@ -27,28 +26,8 @@ g.dashboard.new('PCP Redis: Host Overview5')
 + g.dashboard.withVariables([vars.datasource, vars.host, vars.instance])
 + g.dashboard.withPanels(
   g.util.grid.makeGrid([
-    g.panel.row.new('Overview')
-    + g.panel.row.withPanels([
-      g.panel.timeSeries.new('Load average')
-      + g.panel.timeSeries.queryOptions.withTargets([{"expr": 'kernel.all.load{hostname == "$host"}'}])
-      + g.panel.timeSeries.queryOptions.withDatasource("pcp-redis-datasource", '$datasource')
-      + g.panel.timeSeries.options.legend.withCalcs(['min', 'max', 'mean'])
-      + g.panel.timeSeries.options.legend.withDisplayMode("table"),
-
-      g.panel.timeSeries.new('Memory Utilization')
-      + g.panel.timeSeries.queryOptions.withTargets([
-    { expr: 'mem.util.free{hostname == "$host"}', legendFormat: '$metric', format: 'time_series' },
-    { expr: 'mem.util.cached{hostname == "$host"}', legendFormat: '$metric', format: 'time_series' },
-    { expr: 'mem.physmem{hostname == "$host"}', legendFormat: '$metric', format: 'time_series' },
-  ])
-      + g.panel.timeSeries.queryOptions.withDatasource("pcp-redis-datasource", '$datasource')
-      + g.panel.timeSeries.standardOptions.withMin(0),
-
-  ]),
-
-      g.panel.row.new('Swift DB info For $instance')
-    + g.panel.row.withPanels([
-      g.panel.timeSeries.new('Number of Objects')
+    g.panel.row.new('Swift DB info For $instance')
+    + g.panel.row.withPanels([g.panel.timeSeries.new('Number of Objects')
       + g.panel.timeSeries.queryOptions.withTargets([{ expr: 'swiftdbinfo.object.count{hostname == "$host", swift_db_name == "$instance"}', legendFormat: '$instance', format: 'time_series' }])
       + g.panel.timeSeries.queryOptions.withDatasource("pcp-redis-datasource", '$datasource')
       + g.panel.timeSeries.queryOptions.withTransformations([g.panel.timeSeries.queryOptions.transformation.withId("filterFieldsByName")
@@ -115,7 +94,3 @@ g.dashboard.new('PCP Redis: Host Overview5')
 
 ], panelWidth=12)
 )
-
-# todo: 1.add filter by instance
-# 2. add dist graph
-# 3. add option to import deprecated dasborad and add it to the one written in new version

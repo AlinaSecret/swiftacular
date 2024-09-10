@@ -1,7 +1,7 @@
-local grafana = import 'swift/grafonnet/grafonnet/grafana.libsonnet';
+local grafana = import 'github.com/grafana/grafonnet-lib/grafonnet/grafana.libsonnet';
 
 grafana.dashboard.new(
-  'PCP Redis: Host Overview4',
+  'Host Overview',
   tags=['swift'],
   time_from='now-30m',
   time_to='now',
@@ -524,6 +524,7 @@ grafana.dashboard.new(
     w: 12,
     h: 7,
   }
+// XFS addition to pcp host overview dashboard
 ).addPanel(
   grafana.row.new(
     title='XFS'
@@ -670,65 +671,6 @@ grafana.dashboard.new(
     h: 7,
   }
 )
-.addPanel(
-  grafana.row.new(
-    title='Swift DB Info'
-  ), gridPos={
-    x: 0,
-    y: 119,
-    w: 24,
-    h: 1,
-  }
-)
-.addPanel(
-  grafana.graphPanel.new(
-    'Number of Objects',
-    datasource='$datasource',
-    format='percentunit',
-    min=0,
-    max=1,
-  )
-  .addTargets([
-    { expr: 'swiftdbinfo.object.count{hostname == "$host", swift_db_name == "$instance"}', legendFormat: '$instance', format: 'time_series' },
-  ]), gridPos={
-    x: 0,
-    y: 119,
-    w: 12,
-    h: 7,
-  }
-)
-.addPanel(
-  grafana.graphPanel.new(
-    'Size of DB',
-    datasource='$datasource',
-    format='percentunit',
-    min=0,
-    max=1,
-  )
-  .addTargets([
-    { expr: 'swiftdbinfo.size{hostname == "$host", swift_db_name == "$instance"}', legendFormat: '$instance', format: 'time_series' },
-  ]), gridPos={
-    x: 12,
-    y: 119,
-    w: 12,
-    h: 7,
-  }
-).addPanel(
-  grafana.graphPanel.new(
-    'Distrbution of $instance',
-    datasource='$datasource',
-    format='percentunit',
-    min=0,
-    max=1,
-  )
-  .addTargets([
-    { expr: 'swiftdbinfo.object.dist{hostname == "$host", swift_db_name == "$instance"}', legendFormat: '$instance', format: 'time_series' },
-  ]), gridPos={
-    x: 0,
-    y: 126,
-    w: 12,
-    h: 7,
-  }
-)+ {
++ {
   revision: 3,
 }
