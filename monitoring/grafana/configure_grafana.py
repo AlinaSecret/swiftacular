@@ -2,15 +2,13 @@ import argparse
 import json
 import subprocess
 from grafana_client import GrafanaApi
-import _jsonnet
-import os
 
 # Initialize the Grafana API client
 def initialize_client(endpoint, user, password):
     return GrafanaApi(auth=(user, password), host=endpoint)
 
 # Create PCP datasource
-def create_pcp_datasource(client, name, ip):
+def create_pcp_datasource(client: GrafanaApi, name: str, ip: str):
     datasource_config = {
         "name": name,
         "type": "pcp-redis-datasource",
@@ -28,38 +26,16 @@ def create_pcp_datasource(client, name, ip):
         raise(e)
 
 # Delete default PCP datasource
-def delete_default_pcp_datasource(client):
+def delete_default_pcp_datasource(client: GrafanaApi):
     try:
         client.datasource.delete_datasource_by_name("PCP Redis")
         print("Default PCP datasource deleted successfully")
         return
-        print("Default PCP datasource not found")
     except Exception as e:
         print(f"Failed to delete default PCP datasource: {e}")
 
-def try_path(dir, rel):
-    if not rel:
-        raise RuntimeError('Got invalid filename (empty string).')
-    if rel[0] == '/':
-        full_path = rel
-    else:
-        full_path = dir + rel
-    if full_path[-1] == '/':
-        raise RuntimeError('Attempted to import a directory')
 
-    if not os.path.isfile(full_path):
-        return full_path, None
-    with open(full_path) as f:
-        return full_path, f.read()
-
-
-def import_callback(dir, rel):
-    full_path, content = try_path(dir + "vendor", rel)
-    if content:
-        return full_path, content
-    raise RuntimeError('File not found')
-
-def run_jsonnet_with_imports(jsonnet_file):
+def run_jsonnet_with_imports(jsonnet_file: str):
     try:
         result = subprocess.run(
             ['jsonnet', jsonnet_file], capture_output=True, text=True
@@ -71,33 +47,8 @@ def run_jsonnet_with_imports(jsonnet_file):
     except FileNotFoundError:
         print("Jsonnet executable not found. Ensure it's installed and in your PATH.")
 
-
-# Read dashboard JSON from file
-def read_dashboard_from_file(file_path):
-    return json.loads(run_jsonnet_with_imports(file_path))
-    try:
-        with open(file_path, 'r') as file:
-            return json.loads(convert_jsonnet_to_json(file.read()))
-    except Exception as e:
-        print(f"Failed to read dashboard file: {e}")
-        raise(e)
-        return None
-
-def convert_jsonnet_to_json(jsonnet_snippet):
-    """
-    Convert a Jsonnet snippet into JSON.
-
-    Parameters:
-    - jsonnet_snippet (str): The Jsonnet code as a string.
-
-    Returns:
-    - str: The JSON output.
-    """
-    json_str = _jsonnet.evaluate_snippet('snippet', jsonnet_snippet)
-    return json_str
-
 # Create dashboard
-def create_dashboard(client, dashboard_json, uid):
+def create_dashboard(client: GrafanaApi, dashboard_json, uid: str):
     dashboard_json["uid"] = uid
     try:
         response = client.dashboard.update_dashboard({
@@ -105,7 +56,6 @@ def create_dashboard(client, dashboard_json, uid):
             "overwrite": True
         })
     except Exception as e:
-        raise(e)
         print(f"Failed to create dashboard: {e}")
 
 # Main function to parse arguments and call the appropriate functions
@@ -145,7 +95,7 @@ def main():
     elif args.command == "delete-default-pcp-datasource":
         delete_default_pcp_datasource(client)
     elif args.command == "create-dashboard":
-        dashboard_json = read_dashboard_from_file(args.json_file_path)
+        dashboard_json = json.loads(run_jsonnet_with_imports(args.json_file_path))
         if dashboard_json:
             create_dashboard(client, dashboard_json, args.uid)
     else:
