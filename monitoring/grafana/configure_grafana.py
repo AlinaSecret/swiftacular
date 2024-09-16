@@ -38,7 +38,7 @@ def delete_default_pcp_datasource(client: GrafanaApi):
 def run_jsonnet_with_imports(jsonnet_file: str):
     try:
         result = subprocess.run(
-            ['jsonnet', jsonnet_file], capture_output=True, text=True
+            ['jsonnet', "-J", "vendor", jsonnet_file], capture_output=True, text=True
         )
         if result.returncode == 0:
             return result.stdout

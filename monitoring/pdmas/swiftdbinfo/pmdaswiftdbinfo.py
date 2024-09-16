@@ -9,6 +9,7 @@ import sqlite3
 import json
 from datetime import datetime, timezone
 from dataclasses import dataclass
+# Configuration
 
 SHOULD_TRACK_EXPIRING_OBJECTS = False
 EXPIRING_OBJECTS_ACCOUNT_INDICATOR = "expiring"
@@ -26,6 +27,7 @@ BUCKET_DICT = {
     '1 GB - 5 GB': 5368709120
 }
 
+# Configuration End
 
 SWIFT_DB_PATH_INDICATOR = "containers"
 
@@ -34,12 +36,11 @@ class DB:
     path: str
     container: str
     account: str
-    hash: str
     discovery_time: int
     id: Optional[int] = None
 
     def __str__(self):
-        return f"{str(self.discovery_time)}__{self.container}__{self.account}__{self.hash}"
+        return f"{str(self.discovery_time)}__{self.container}__{self.account}"
 
 
 OBJECT_COUNT_QUERY = """SELECT COUNT(*) AS TotalNumberOfObjects
@@ -60,7 +61,7 @@ class EtcdPMDA(PMDA):
         self.db_instances_indom = self.indom(0)
         self.next_id = 0
         self.__add_dbs()
-        self.add_indom(pmdaIndom(self.db_instances_indom, self.db_instances))
+        self.add_indom(pmdaIndom(self.db_instances_indom, [pmdaInstid(id, db) for id, db in self.db_instances]))
         self.set_fetch(self.simple_fetch)
         self.set_fetch_callback(self.fetch_callback)
         self.set_label_callback(self.simple_label_callback)
@@ -69,7 +70,7 @@ class EtcdPMDA(PMDA):
             PM_TYPE_U64,
             self.db_instances_indom,
             PM_SEM_INSTANT,
-            kbyteUnits # todo checlk if bytes and not kb
+            kbyteUnits
         ))
         self.add_metric(name + '.object.count', pmdaMetric(
             PMDA.pmid(0, 1),
@@ -105,13 +106,13 @@ class EtcdPMDA(PMDA):
                 if SWIFT_DB_PATH_INDICATOR in db_path:
                     db_info = ContainerBroker(db_path).get_info()
                     db = DB(path=db_path,container=db_info["container"], account=db_info["account"],
-                            hash=db_info["hash"], discovery_time=int(datetime.now(timezone.utc).timestamp()))
+                             discovery_time=int(datetime.now(timezone.utc).timestamp()))
                     is_expired_objects = EXPIRING_OBJECTS_ACCOUNT_INDICATOR in db.account
-                    if self.db_hashes.get(db.hash) is None and (not is_expired_objects or SHOULD_TRACK_EXPIRING_OBJECTS):
-                        self.db_hashes[db.hash] = True
+                    if self.db_hashes.get(db.path) is None and (not is_expired_objects or SHOULD_TRACK_EXPIRING_OBJECTS):
+                        self.db_hashes[db.path] = True
                         db.id = self.next_id
                         self.id_to_db[self.next_id] = db
-                        self.db_instances.append(pmdaInstid(int(self.next_id), str(db)))
+                        self.db_instances.append((int(self.next_id), str(db)))
                         self.next_id += 1
         except Exception as e:
             self.log(f"exception occured when detecting new dbs Error: {str(e)}")
@@ -121,7 +122,6 @@ class EtcdPMDA(PMDA):
         '''
         Return JSONB format labelset for an inst in given indom, as a string
         '''
-        # todo can fail here if indom is regular int
         if indom == self.db_instances_indom and inst in self.id_to_db.keys():
             db = self.id_to_db[inst]
             return json.dumps({"swift_db_name":str(db)})
@@ -129,7 +129,9 @@ class EtcdPMDA(PMDA):
 
     def simple_fetch(self):
         self.__add_dbs()
-        self.replace_indom(self.db_instances_indom, self.db_instances)
+        self.clear_indoms()
+        self.add_indom(pmdaIndom(self.db_instances_indom, [pmdaInstid(id, db) for id, db in self.db_instances]))
+        #self.replace_indom(self.db_instances_indom, [pmdaInstid(id, db) for id, db in self.db_instances])
 
     def __get_db_size(self, db: DB):
         info = ContainerBroker(db.path).get_info()
@@ -158,15 +160,15 @@ class EtcdPMDA(PMDA):
 
     # item is id of metric is this pdma as set in add metric fucntion
     def fetch_callback(self, cluster, item: int, inst: int):
+        self.log(f" number is {inst}")
         if inst >= self.next_id:
             return [cpmapi.PM_ERR_INST, 0]
 
         self.log(f"fetching: cluster: {cluster} item: {item} instance: {inst}")
         if item >= len(self.metric_to_callbacks):
-            #todo change to coorect error
-            return [cpmapi.PM_ERR_INST, 0]
-        callback = self.metric_to_callbacks[item]
+            return [0, 0]
         try:
+            callback = self.metric_to_callbacks[item]
             db = self.id_to_db[inst]
             return callback(db)
         except Exception as e:
